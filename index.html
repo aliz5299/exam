@@ -154,6 +154,7 @@ details summary{cursor:pointer;font-weight:600;color:var(--accent)}
         <select id="secSel"></select>
       </label>
     </div>
+    <div id="nameMsg" class="msg" hidden></div>
     <div id="saveMsg" class="msg" hidden></div>
     <div class="row">
       <button class="btn primary" id="saveBtn" type="button" style="flex:1">حفظ في الكشف</button>
@@ -198,6 +199,19 @@ details summary{cursor:pointer;font-weight:600;color:var(--accent)}
     <div id="quickMsg" class="msg" hidden></div>
     <div class="qs" id="keyQs"></div>
   </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2>قائمة الطلاب</h2>
+      <span class="pill" id="rosterCount"></span>
+    </div>
+    <div class="note">الصق أسماء الطلاب وأرقامهم الجامعية، كل طالب في سطر (الاسم ثم الرقم أو العكس، كما تُنسخ من Excel). تُحفظ القائمة في هذا الجهاز فقط ولا تُرفع إلى أي مكان، ويظهر اسم الطالب عند كتابة رقمه.</div>
+    <textarea id="rosterBox" rows="5" dir="rtl" style="width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:inherit" placeholder="محمد بن أحمد العلي	447100000"></textarea>
+    <div class="row">
+      <button class="btn primary" id="rosterSave" type="button" style="flex:1">حفظ القائمة</button>
+      <button class="btn" id="rosterClear" type="button">مسح</button>
+    </div>
+    <div id="rosterMsg" class="msg" hidden></div>
+  </div>
 </section>
 
 <section id="results">
@@ -209,6 +223,7 @@ details summary{cursor:pointer;font-weight:600;color:var(--accent)}
     <div class="tiles" id="tiles"></div>
     <div id="emptyMsg" class="note">لا توجد أوراق محفوظة بعد. صحّح ورقة من تبويب «تصحيح» ثم احفظها.</div>
     <div class="tablebox"><table id="tbl"></table></div>
+    <div id="missMsg" class="msg warn" hidden></div>
     <div class="row">
       <button class="btn" id="copyBtn" type="button" style="flex:1">نسخ الكشف للصقه في Excel</button>
       <button class="btn" id="csvBtn" type="button" style="flex:1" hidden>تنزيل ملف CSV</button>
@@ -1622,7 +1637,7 @@ function msg(node,cls,text){node.className='msg '+cls; node.textContent=text; no
 
 /* tabs */
 function show(tab){['grade','key','results'].forEach(function(t){$(t).classList.toggle('on',t===tab); $('tab-'+t).setAttribute('aria-selected',t===tab);});
-  if(tab==='key') renderKey(); if(tab==='results') renderResults(); if(tab==='grade') renderHead();}
+  if(tab==='key'){renderKey(); renderRoster();} if(tab==='results') renderResults(); if(tab==='grade') renderHead();}
 document.querySelectorAll('nav button').forEach(function(b){b.addEventListener('click',function(){show(b.dataset.tab); try{location.hash=b.dataset.tab;}catch(e){}});});
 
 /* question rows */
@@ -1661,7 +1676,7 @@ function process(src,demo){ $('result').hidden=true; cur=null; msg($('status'),'
     present(r,demo);
   }).catch(function(){msg($('status'),'bad','تعذر فتح الصورة. جرّب صورة أخرى.');}).finally(function(){if(src.indexOf('blob:')===0) URL.revokeObjectURL(src);});},30);}
 function present(r,demo){cur={answers:r.answers,flags:r.flags,section:r.section,form:r.form||0,formMismatch:r.formBubble!==r.form,flat:r.flat,demo:!!demo,id:''};
-  msg($('status'),'',''); $('result').hidden=false; $('saveBtn').textContent='حفظ في الكشف'; $('idInput').value=''; $('allDetails').open=false; renderResult(); $('result').scrollIntoView({behavior:'smooth',block:'start'});}
+  msg($('status'),'',''); $('result').hidden=false; $('saveBtn').textContent='حفظ في الكشف'; $('idInput').value=''; $('nameMsg').hidden=true; $('allDetails').open=false; renderResult(); $('result').scrollIntoView({behavior:'smooth',block:'start'});}
 var video=$('video'), stream=null, timer=null, lastPos=null;
 function grab(max){var w=video.videoWidth,h=video.videoHeight; if(!w) return null; var sc=Math.min(1,max/Math.max(w,h)),c=grab.c||(grab.c=document.createElement('canvas')); c.width=Math.round(w*sc); c.height=Math.round(h*sc);
   var x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(video,0,0,c.width,c.height); return x.getImageData(0,0,c.width,c.height);}
@@ -1707,7 +1722,7 @@ function drawSheet(k){var S=OMR.S,c=$('sheetCanvas'),src=cur._fc||(cur._fc=flatC
   for(var q=1;q<=N;q++) LAYS[cur.form].questions[q].opts.forEach(function(o){var a=cur.answers[q],col=null,dash=false;
     if(a===o.o) col=cur.flags[q]&&!k?'#d08a00':(k?(k[q]===o.o?'#1d8a4e':'#c23b32'):'#0d7377'); else if(k&&k[q]===o.o&&a!==k[q]){col='#1d8a4e'; dash=true;}
     if(!col) return; x.strokeStyle=col; x.setLineDash(dash?[8,6]:[]); x.beginPath(); x.arc(o.c[0]*S,o.c[1]*S,OMR.L.R*S+5,0,6.3); x.stroke();});}
-$('idInput').addEventListener('input',function(){this.value=this.value.replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d);}).replace(/\D/g,'').slice(0,9); if(cur) cur.id=this.value;});
+$('idInput').addEventListener('input',function(){this.value=this.value.replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d);}).replace(/\D/g,'').slice(0,9); if(cur) cur.id=this.value; showName();});
 $('secSel').addEventListener('change',function(){if(cur) cur.section=this.value||null;});
 $('discardBtn').addEventListener('click',function(){cur=null; $('result').hidden=true; window.scrollTo({top:0,behavior:'smooth'});});
 $('saveBtn').addEventListener('click',function(){ if(!cur||cur.demo) return; var id=$('idInput').value;
@@ -1716,9 +1731,27 @@ $('saveBtn').addEventListener('click',function(){ if(!cur||cur.demo) return; var
   if(keyFilled(cur.form)!==N) return msg($('saveMsg'),'bad','أكمل المفتاح من تبويب «المفتاح» قبل الحفظ.');
   var dup=st.results.findIndex(function(r){return r.id===id;});
   if(dup>=0&&!cur.confirmDup){cur.confirmDup=true; $('saveBtn').textContent='استبدال الورقة السابقة'; return msg($('saveMsg'),'warn','هذا الرقم الجامعي محفوظ من قبل بدرجة '+fmt(st.results[dup].score)+'. اضغط «استبدال الورقة السابقة» للتأكيد، أو صحح الرقم.');}
-  var rec={id:id,section:cur.section||'',form:cur.form,answers:cur.answers,score:scoreOf(cur.answers,cur.form),max:maxScore(cur.form),at:Date.now()};
+  var rec={id:id,name:nameOf(id),section:cur.section||'',form:cur.form,answers:cur.answers,score:scoreOf(cur.answers,cur.form),max:maxScore(cur.form),at:Date.now()};
   if(dup>=0) st.results.splice(dup,1); st.results.unshift(rec); save(); cur=null; $('saveBtn').textContent='حفظ في الكشف'; $('result').hidden=true; renderHead();
-  msg($('status'),'good','حُفظت ورقة '+STU+' '+id+' بدرجة '+fmt(rec.score)+' من '+fmt(rec.max)+'. صوّر الورقة التالية.'); window.scrollTo({top:0,behavior:'smooth'});});
+  msg($('status'),'good','حُفظت ورقة '+STU+' '+(nameOf(id)?nameOf(id)+' ('+id+')':id)+' بدرجة '+fmt(rec.score)+' من '+fmt(rec.max)+'. صوّر الورقة التالية.'); window.scrollTo({top:0,behavior:'smooth'});});
+
+/* roster */
+function roster(){return st.roster||(st.roster={});}
+function nameOf(id){return roster()[id]||'';}
+function nearIds(id){return Object.keys(roster()).filter(function(k){var d=0; for(var i=0;i<9;i++) if(k[i]!==id[i]) d++; return d===1;});}
+function showName(){var id=$('idInput').value, box=$('nameMsg'), n=Object.keys(roster()).length; box.textContent='';
+  if(!n||id.length!==9){box.hidden=true; return;}
+  if(nameOf(id)){box.className='msg good'; box.textContent=nameOf(id); box.hidden=false; return;}
+  box.className='msg warn'; box.hidden=false; box.appendChild(document.createTextNode('هذا الرقم غير موجود في قائمة الطلاب. راجعه مع صورة الخانات.'));
+  nearIds(id).slice(0,3).forEach(function(k){var b=el('button','btn small',k+' · '+nameOf(k)); b.type='button'; b.style.margin='8px 0 0'; b.style.display='block';
+    b.addEventListener('click',function(){$('idInput').value=k; if(cur) cur.id=k; showName();}); box.appendChild(b);});}
+function renderRoster(){var r=roster(), ids=Object.keys(r); $('rosterCount').textContent=ids.length?'عدد الطلاب: '+ids.length:'لا توجد قائمة'; $('rosterCount').className='pill '+(ids.length?'good':'warn');
+  $('rosterBox').value=ids.map(function(k){return r[k]+'\t'+k;}).join('\n');}
+$('rosterSave').addEventListener('click',function(){var out={}, bad=0;
+  $('rosterBox').value.split(/\n/).forEach(function(line){line=line.replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d);}); if(!line.trim()) return;
+    var m=line.match(/(^|\D)(\d{9})(\D|$)/); if(!m){bad++; return;} var nm=line.replace(m[2],' ').replace(/^[\s\d.،,;|-]+/,'').replace(/[\t|,;]+/g,' ').replace(/\s+/g,' ').trim(); out[m[2]]=nm||m[2];});
+  st.roster=out; save(); renderRoster(); msg($('rosterMsg'),bad?'warn':'good','حُفظت القائمة، عدد الطلاب: '+Object.keys(out).length+(bad?'. أسطر تُركت لأنها بلا رقم جامعي من 9 أرقام: '+bad+'.':'.'));});
+$('rosterClear').addEventListener('click',function(){st.roster={}; save(); renderRoster(); msg($('rosterMsg'),'warn','مُسحت قائمة الطلاب من هذا الجهاز.');});
 
 /* results tab */
 var filter='';
@@ -1727,16 +1760,17 @@ function renderResults(){ var fs=$('filterSel'); fs.textContent=''; var o=el('op
   var rs=rows(), t=$('tiles'); t.textContent=''; var sc=rs.map(function(r){return scoreOf(r.answers,r.form);});
   [['الأوراق',rs.length],['المتوسط',sc.length?fmt(sc.reduce(function(a,b){return a+b;},0)/sc.length):'—'],['الأعلى',sc.length?fmt(Math.max.apply(null,sc)):'—'],['الأدنى',sc.length?fmt(Math.min.apply(null,sc)):'—']].forEach(function(x){var d=el('div','tile'); d.appendChild(el('b','',x[1])); d.appendChild(el('span','',x[0])); t.appendChild(d);});
   $('emptyMsg').hidden=rs.length>0; var tb=$('tbl'); tb.textContent='';
-  if(rs.length){var h=el('tr'); ['الرقم الجامعي'].concat(HASSEC?['الشعبة']:[],MULTI?['النموذج']:[],['الدرجة','']).forEach(function(x){h.appendChild(el('th','',x));}); tb.appendChild(h);
-    rs.forEach(function(r,i){var tr=el('tr'); tr.appendChild(el('td','num',r.id)); if(HASSEC) tr.appendChild(el('td','',r.section)); if(MULTI) tr.appendChild(el('td','',FORMS[r.form])); tr.appendChild(el('td','num',fmt(sc[i])+' / '+fmt(maxScore(r.form))));
+  if(rs.length){var h=el('tr'); ['الاسم','الرقم الجامعي'].concat(HASSEC?['الشعبة']:[],MULTI?['النموذج']:[],['الدرجة','']).forEach(function(x){h.appendChild(el('th','',x));}); tb.appendChild(h);
+    rs.forEach(function(r,i){var tr=el('tr'); tr.appendChild(el('td','',nameOf(r.id)||r.name||'—')); tr.appendChild(el('td','num',r.id)); if(HASSEC) tr.appendChild(el('td','',r.section)); if(MULTI) tr.appendChild(el('td','',FORMS[r.form])); tr.appendChild(el('td','num',fmt(sc[i])+' / '+fmt(maxScore(r.form))));
       var td=el('td'),b=el('button','btn small danger','حذف'); b.type='button'; b.addEventListener('click',function(){if(b.dataset.sure){st.results.splice(st.results.indexOf(r),1); save(); renderResults();} else{b.dataset.sure='1'; b.textContent='تأكيد الحذف';}}); td.appendChild(b); tr.appendChild(td); tb.appendChild(tr);});}
+  var done={}; st.results.forEach(function(r){done[r.id]=1;}); var miss=Object.keys(roster()).filter(function(k){return !done[k];}); $('missMsg').hidden=!miss.length||!st.results.length; $('missMsg').textContent='لم تُحفظ أوراقهم بعد ('+miss.length+'): '+miss.map(function(k){return nameOf(k);}).join('، ');
   $('copyBtn').disabled=!rs.length; $('csvBtn').disabled=!rs.length; $('itemsCard').hidden=!rs.length; var it=$('items'); it.textContent='';
   FORMS.forEach(function(name,f){var fr=rs.filter(function(r){return r.form===f;}); if(!fr.length) return; var k=st.keys[f]||{};
     var h=el('div','note',(MULTI?'نموذج '+name+' ':'')+'('+fr.length+' ورقة)'); h.style.gridColumn='1 / -1'; h.style.direction='rtl'; it.appendChild(h);
     for(var q=1;q<=N;q++){var ok=0; fr.forEach(function(r){if(k[q]&&r.answers[q]===k[q]) ok++;}); var p=Math.round(ok*100/fr.length), d=el('div','item '+(p<40?'lo':p<70?'mid':'hi')); d.appendChild(el('b','',q)); d.append(p+'%'); it.appendChild(d);}});}
 $('filterSel').addEventListener('change',function(){filter=this.value; renderResults();});
-function table(sep){var head=['الرقم الجامعي','الشعبة','النموذج','الدرجة','من']; for(var q=1;q<=N;q++) head.push('س'+q);
-  var out=[head.join(sep)]; rows().forEach(function(r){var a=[r.id,r.section,FORMS[r.form],fmt(scoreOf(r.answers,r.form)),fmt(maxScore(r.form))]; for(var q=1;q<=N;q++) a.push(r.answers[q]?(r.answers[q]==='T'?'صح':r.answers[q]==='F'?'خطأ':r.answers[q]):''); out.push(a.join(sep));}); return out.join('\n');}
+function table(sep){var head=['الاسم','الرقم الجامعي','الشعبة','النموذج','الدرجة','من']; for(var q=1;q<=N;q++) head.push('س'+q);
+  var out=[head.join(sep)]; rows().forEach(function(r){var a=[nameOf(r.id)||r.name||'',r.id,r.section,FORMS[r.form],fmt(scoreOf(r.answers,r.form)),fmt(maxScore(r.form))]; for(var q=1;q<=N;q++) a.push(r.answers[q]?(r.answers[q]==='T'?'صح':r.answers[q]==='F'?'خطأ':r.answers[q]):''); out.push(a.join(sep));}); return out.join('\n');}
 $('copyBtn').addEventListener('click',function(){var t=table('\t'); (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){msg($('exportMsg'),'good','نُسخ الكشف. افتح Excel والصقه في أول خلية.');}).catch(function(){msg($('exportMsg'),'bad','لم يسمح المتصفح بالنسخ. جرّب زر التنزيل إن ظهر، أو افتح الصفحة في متصفح آخر.');});});
 $('csvBtn').hidden=false;
 $('csvBtn').addEventListener('click',function(){var u=URL.createObjectURL(new Blob(['\ufeff'+table(',')],{type:'text/csv;charset=utf-8'})),a=document.createElement('a'); a.href=u; a.download='كشف-'+EID+'-أثر'+(filter?'-'+filter:'')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(u);},2000); msg($('exportMsg'),'good','جرى تنزيل الملف.');});
